@@ -10,6 +10,9 @@ interface ChatInputProps {
 
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false }) => {
   const [message, setMessage] = useState('');
+  const [previousListeningState, setPreviousListeningState] = useState(false);
+  const [hasStoppedListening, setHasStoppedListening] = useState(false);
+  const [lastTranscript, setLastTranscript] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const {
@@ -18,7 +21,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
     startListening,
     stopListening,
     resetTranscript,
-    isSupported
+    isSupported,
+    error
   } = useVoiceRecognition();
   
   // 处理输入变化
@@ -41,6 +45,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
     if (trimmedMessage && !isLoading) {
       onSendMessage(trimmedMessage);
       setMessage('');
+      resetTranscript();
+      setLastTranscript('');
       
       // 聚焦输入框
       if (textareaRef.current) {
@@ -52,11 +58,20 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
   // 语音识别切换
   const toggleVoiceRecognition = () => {
     if (isListening) {
+      setHasStoppedListening(true); // 标记为主动停止
+      
+      // 保存当前transcript，防止丢失
+      if (transcript) {
+        setLastTranscript(transcript);
+      }
+      
       stopListening();
     } else {
-      startListening();
-      // 清除现有的消息
+      resetTranscript();
       setMessage('');
+      setLastTranscript('');
+      setHasStoppedListening(false);
+      startListening();
     }
   };
   
@@ -64,6 +79,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
   const handleClear = () => {
     setMessage('');
     resetTranscript();
+    setLastTranscript('');
     
     // 聚焦输入框
     if (textareaRef.current) {
@@ -71,12 +87,39 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
     }
   };
   
-  // 当transcript更新时，更新消息
+  // 跟踪isListening的变化和transcript
   useEffect(() => {
-    if (transcript) {
-      setMessage(transcript);
+    // 当从listening状态变为非listening状态时
+    if (previousListeningState && !isListening) {
+      // 使用transcript或lastTranscript，以非空者为准
+      const finalTranscript = transcript || lastTranscript;
+      
+      // 如果有识别结果
+      if (finalTranscript.trim()) {
+        setMessage(finalTranscript);
+      }
+      
+      // 重置停止标记
+      setHasStoppedListening(false);
+    }
+    
+    // 更新先前的listening状态
+    setPreviousListeningState(isListening);
+  }, [isListening, transcript, previousListeningState, hasStoppedListening, lastTranscript]);
+  
+  // 当transcript更新时保存最新值
+  useEffect(() => {
+    if (transcript && transcript.trim()) {
+      setLastTranscript(transcript);
     }
   }, [transcript]);
+  
+  // 当transcript更新且正在监听时，实时更新消息
+  useEffect(() => {
+    if (transcript && isListening) {
+      setMessage(transcript);
+    }
+  }, [transcript, isListening]);
   
   // 动态调整textarea高度
   useEffect(() => {
@@ -89,7 +132,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
   
   return (
     <div className="bg-dark-800/60 backdrop-blur-sm rounded-xl p-3 border border-dark-700">
-      <div className="relative">
+      <div className="relative flex items-center">
         <textarea
           ref={textareaRef}
           value={message}
@@ -101,7 +144,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
           rows={1}
         />
         
-        <div className="absolute right-2 bottom-2 flex space-x-1">
+        <div className="absolute right-3 flex space-x-1">
           {/* 清除按钮 - 仅当有内容时显示 */}
           {message && (
             <Button
@@ -142,10 +185,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
         </div>
       </div>
       
-      {/* 快捷提示 */}
+      {/* 快捷提示和状态信息 */}
       <div className="mt-2 text-xs text-dark-400 flex justify-between">
         <span>按 Enter 发送 · Shift+Enter 换行</span>
         {isListening && <span className="text-primary-400 animate-pulse">正在聆听您的声音...</span>}
+        {error && <span className="text-red-400">错误: {error}</span>}
       </div>
     </div>
   );
