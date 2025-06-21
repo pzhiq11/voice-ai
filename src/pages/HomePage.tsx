@@ -47,7 +47,7 @@ const HomePage: React.FC = () => {
             <div className="bg-dark-800/50 border border-dark-700 rounded-xl overflow-hidden shadow-2xl">
               <div className="aspect-video max-h-[600px] w-full overflow-hidden">
                 <img
-                  src="http://zhiji-pzhiq.top/uploads/1750239388646-m0qbq4.png"
+                  src="https://qiniu.zhiji-pzhiq.top/uploads/1750239388646-m0qbq4.png"
                   alt="Voice AI演示"
                   className="w-full h-full object-cover"
                 />
